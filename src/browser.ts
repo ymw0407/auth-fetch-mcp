@@ -17,19 +17,6 @@ export function getUserDataDir(): string {
 }
 
 /**
- * Whether a saved session (persistent context data) exists on disk.
- * We check for the presence of key Chromium profile files.
- */
-export function hasSavedSession(): boolean {
-  const dir = getUserDataDir();
-  // Chromium writes "Cookies" and "Default/Cookies" depending on version
-  return (
-    fs.existsSync(path.join(dir, "Default")) ||
-    fs.existsSync(path.join(dir, "Cookies"))
-  );
-}
-
-/**
  * Returns the live browser context if one is open, or null.
  */
 export function getContext(): BrowserContext | null {
@@ -87,15 +74,6 @@ export async function navigateTo(
 
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
   return page;
-}
-
-/**
- * Returns the most recently active page, or null.
- */
-export async function getActivePage(): Promise<Page | null> {
-  if (!context) return null;
-  const pages = context.pages();
-  return pages.length > 0 ? pages[pages.length - 1] : null;
 }
 
 /**

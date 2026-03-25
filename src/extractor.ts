@@ -9,10 +9,16 @@ const turndown = new TurndownService({
   bulletListMarker: "-",
 });
 
-// Strip images to keep output text-only
-turndown.addRule("removeImages", {
+// Preserve images as markdown ![alt](src)
+turndown.addRule("keepImages", {
   filter: "img",
-  replacement: () => "",
+  replacement: (_content, node) => {
+    const el = node as HTMLElement;
+    const src = el.getAttribute("src") || "";
+    const alt = el.getAttribute("alt") || "";
+    if (!src) return "";
+    return `![${alt}](${src})`;
+  },
 });
 
 /**
