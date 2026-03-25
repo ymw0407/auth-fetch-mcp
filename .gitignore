@@ -1,0 +1,6 @@
+node_modules/
+dist/
+browser-data/
+*.js.map
+*.d.ts
+!src/**/*.d.ts
