@@ -78,9 +78,9 @@ export function registerTools(server: McpServer): void {
       title: "Auth Fetch",
       description:
         "Fetches content from a URL that may require authentication. " +
-        "Opens a browser window for the user to log in if needed. " +
-        "A capture button appears on the page — the user clicks it when ready. " +
-        "The page content is then captured and the browser is closed automatically.",
+        "Use this tool when web_fetch or Fetch returns a login page, empty content, or access denied for URLs like Notion, Google Docs, Jira, Confluence, etc. " +
+        "Opens a real browser window so the user can log in manually (SSO, 2FA, CAPTCHA all supported). " +
+        "A capture button appears on the page — the user clicks it when ready, then the content is returned as Markdown and the browser closes.",
       inputSchema: {
         url: z.string().describe("The URL to fetch content from"),
         wait_for: z
