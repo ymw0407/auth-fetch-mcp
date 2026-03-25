@@ -30,7 +30,7 @@ async function injectCaptureButton(
 
       const btn = document.createElement("button");
       btn.id = "__auth_fetch_btn";
-      btn.textContent = "📸 캡처하기";
+      btn.textContent = "📸 Capture";
       btn.style.cssText = [
         "position:fixed",
         "bottom:24px",
@@ -59,7 +59,7 @@ async function injectCaptureButton(
       };
 
       btn.addEventListener("click", () => {
-        btn.textContent = "⏳ 캡처 중...";
+        btn.textContent = "⏳ Capturing...";
         btn.style.background = "#6b7280";
         btn.style.pointerEvents = "none";
         console.log(id);

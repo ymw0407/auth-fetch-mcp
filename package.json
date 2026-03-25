@@ -1,6 +1,6 @@
 {
   "name": "auth-fetch-mcp",
-  "version": "2.0.0",
+  "version": "2.0.2",
   "description": "MCP server that fetches authenticated web page content via a real browser",
   "main": "dist/index.js",
   "bin": {
@@ -25,7 +25,15 @@
     "cursor",
     "ai"
   ],
-  "author": "",
+  "author": "ymw0407",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ymw0407/auth-fetch-mcp.git"
+  },
+  "homepage": "https://github.com/ymw0407/auth-fetch-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/ymw0407/auth-fetch-mcp/issues"
+  },
   "license": "MIT",
   "type": "commonjs",
   "dependencies": {
