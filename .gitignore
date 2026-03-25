@@ -4,3 +4,6 @@ browser-data/
 *.js.map
 *.d.ts
 !src/**/*.d.ts
+
+# Root-level temp images (keep assets/ for README)
+/image.png

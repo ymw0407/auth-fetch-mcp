@@ -7,12 +7,24 @@ MCP server that lets AI assistants fetch content from authenticated web pages.
 
 When your AI tries to read a URL that requires login, this tool opens a real browser for you to sign in — then captures the page content. Sessions are saved locally, so you only log in once per service.
 
+## Demo
+
+> "Summarize this Notion page for me"
+
+A browser opens with a **Capture** button. Log in if needed, then click it:
+
+![Browser with Capture button](assets/browser-capture.png)
+
+The AI receives the full page content and responds:
+
+![Claude Code summarizing a Notion page](assets/claude-code-demo.png)
+
 ## Quick Start
 
 ### Claude Code
 
 ```bash
-claude mcp add auth-fetch -- npx auth-fetch-mcp@latest
+claude mcp add --scope user auth-fetch -- npx auth-fetch-mcp@latest
 ```
 
 ### .mcp.json (Cursor, Windsurf, etc.)
