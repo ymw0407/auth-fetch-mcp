@@ -1,6 +1,6 @@
 {
   "name": "auth-fetch-mcp",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "MCP server that fetches authenticated web page content via a real browser",
   "main": "dist/index.js",
   "bin": {
