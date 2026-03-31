@@ -1,0 +1,9 @@
+node_modules
+src
+assets
+.git
+.github
+*.ts
+tsconfig.json
+.gitignore
+.dockerignore

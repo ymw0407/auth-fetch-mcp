@@ -1,0 +1,27 @@
+{
+  "name": "auth-fetch-mcp",
+  "display_name": "Auth Fetch MCP",
+  "description": "MCP server that fetches authenticated web page content via a real browser. Opens a browser for login, then captures page content as Markdown.",
+  "repository": "https://github.com/ymw0407/auth-fetch-mcp",
+  "homepage": "https://github.com/ymw0407/auth-fetch-mcp#readme",
+  "license": "MIT",
+  "author": {
+    "name": "ymw0407"
+  },
+  "categories": ["browser", "web", "authentication"],
+  "tags": ["mcp", "browser", "auth", "fetch", "playwright", "claude", "cursor"],
+  "tools": [
+    {
+      "name": "auth_fetch",
+      "description": "Fetches web page content using a real browser with authentication support. Opens a browser window for the user to log in if needed, then captures page content as Markdown."
+    },
+    {
+      "name": "list_pages",
+      "description": "Lists all open tabs in the browser with their URLs and titles."
+    },
+    {
+      "name": "close_browser",
+      "description": "Closes the browser window. Login sessions are saved and will be reused next time."
+    }
+  ]
+}
