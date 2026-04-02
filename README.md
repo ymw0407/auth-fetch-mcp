@@ -1,6 +1,7 @@
 # auth-fetch-mcp
 
 [![npm version](https://img.shields.io/npm/v/auth-fetch-mcp.svg)](https://www.npmjs.com/package/auth-fetch-mcp)
+[![npm downloads](https://img.shields.io/npm/dw/auth-fetch-mcp.svg)](https://www.npmjs.com/package/auth-fetch-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![auth-fetch-mcp MCP server](https://glama.ai/mcp/servers/ymw0407/auth-fetch-mcp/badges/score.svg)](https://glama.ai/mcp/servers/ymw0407/auth-fetch-mcp)
 
