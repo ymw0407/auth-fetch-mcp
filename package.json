@@ -1,7 +1,7 @@
 {
   "name": "auth-fetch-mcp",
   "version": "2.0.6",
-  "description": "MCP server that fetches authenticated web page content via a real browser",
+  "description": "MCP server that lets AI read Notion, Google Docs, Jira & any login-protected page via a real browser",
   "main": "dist/index.js",
   "bin": {
     "auth-fetch-mcp": "dist/index.js"
@@ -16,14 +16,26 @@
   },
   "keywords": [
     "mcp",
+    "mcp-server",
     "model-context-protocol",
     "browser",
     "auth",
+    "authenticated",
     "fetch",
     "playwright",
     "claude",
+    "claude-code",
     "cursor",
-    "ai"
+    "windsurf",
+    "ai",
+    "llm",
+    "anthropic",
+    "openai",
+    "notion",
+    "google-docs",
+    "login",
+    "scraper",
+    "web-scraper"
   ],
   "author": "ymw0407",
   "repository": {
