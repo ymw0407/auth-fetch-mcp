@@ -5,10 +5,12 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { registerTools } from "./tools.js";
 import { closeBrowser } from "./browser.js";
 
+const pkg = require("../package.json");
+
 const server = new McpServer(
   {
     name: "auth-fetch",
-    version: "2.0.0",
+    version: pkg.version,
   },
   {
     instructions:
@@ -16,7 +18,11 @@ const server = new McpServer(
       "a login page, empty HTML shell, or minimal content (especially from Notion, Google Docs, " +
       "Jira, Confluence, Linear, Slack, or any SaaS platform), you MUST use the auth_fetch tool " +
       "to open a real browser for the user to log in. Do NOT suggest copy-paste, PDF export, or " +
-      "other manual workarounds before trying auth_fetch first.",
+      "other manual workarounds before trying auth_fetch first. " +
+      "auth_fetch returns cleaned HTML with media tags preserved. " +
+      "If the user needs images or files from the captured page, use download_media " +
+      "with the URLs found in the HTML — it downloads them using saved session cookies, " +
+      "so no additional login is required.",
   }
 );
 
@@ -26,7 +32,6 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  // Graceful shutdown
   const cleanup = async () => {
     await closeBrowser();
     await server.close();

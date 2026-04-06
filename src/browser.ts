@@ -5,49 +5,39 @@ import fs from "fs";
 
 let context: BrowserContext | null = null;
 
-/**
- * Returns the persistent browser data directory (~/.auth-fetch-mcp/browser-data/).
- * Creates it if it doesn't exist.
- */
-export function getUserDataDir(): string {
+const USER_DATA_DIR = (() => {
   const home = process.env.HOME || process.env.USERPROFILE || ".";
   const dir = path.join(home, ".auth-fetch-mcp", "browser-data");
   fs.mkdirSync(dir, { recursive: true });
   return dir;
-}
-
-/**
- * Returns the live browser context if one is open, or null.
- */
-export function getContext(): BrowserContext | null {
-  return context;
-}
+})();
 
 /**
  * Launches (or returns) a persistent browser context.
- * @param headed - true to show the browser window (for user login), false for background fetch
+ * Session cookies are stored on disk and reused across restarts.
  */
 export async function getOrLaunchBrowser(
   headed: boolean = true
 ): Promise<BrowserContext> {
   if (context) return context;
 
-  const userDataDir = getUserDataDir();
+  const launchOptions = {
+    headless: !headed,
+    viewport: { width: 1280, height: 800 },
+    args: ["--disable-blink-features=AutomationControlled"],
+  };
 
   try {
-    context = await chromium.launchPersistentContext(userDataDir, {
-      headless: !headed,
-      viewport: { width: 1280, height: 800 },
-      args: ["--disable-blink-features=AutomationControlled"],
-    });
-  } catch (e) {
-    // Chromium not installed — auto-install and retry
+    context = await chromium.launchPersistentContext(
+      USER_DATA_DIR,
+      launchOptions
+    );
+  } catch {
     execSync("npx playwright install chromium", { stdio: "inherit" });
-    context = await chromium.launchPersistentContext(userDataDir, {
-      headless: !headed,
-      viewport: { width: 1280, height: 800 },
-      args: ["--disable-blink-features=AutomationControlled"],
-    });
+    context = await chromium.launchPersistentContext(
+      USER_DATA_DIR,
+      launchOptions
+    );
   }
 
   context.on("close", () => {
@@ -58,16 +48,14 @@ export async function getOrLaunchBrowser(
 }
 
 /**
- * Navigates a page to the given URL.
- * Reuses an existing blank tab or creates a new one.
+ * Navigates to the given URL, reusing a blank tab if available.
  */
 export async function navigateTo(
   ctx: BrowserContext,
   url: string
 ): Promise<Page> {
   const pages = ctx.pages();
-  // Reuse the last page if it's a blank tab
-  let page =
+  const page =
     pages.length > 0 && pages[pages.length - 1].url() === "about:blank"
       ? pages[pages.length - 1]
       : await ctx.newPage();
@@ -83,15 +71,12 @@ export async function getAllPages(): Promise<
   { url: string; title: string }[]
 > {
   if (!context) return [];
-  const pages = context.pages();
-  const result: { url: string; title: string }[] = [];
-  for (const page of pages) {
-    result.push({
+  return Promise.all(
+    context.pages().map(async (page) => ({
       url: page.url(),
       title: await page.title(),
-    });
-  }
-  return result;
+    }))
+  );
 }
 
 /**
