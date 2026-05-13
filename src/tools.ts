@@ -10,6 +10,7 @@ import {
   closeBrowser,
 } from "./browser.js";
 import { extractContent } from "./extractor.js";
+import { assertSafeUrl, resolveSafeOutputDir } from "./security.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -43,18 +44,6 @@ function guessExtension(url: string, contentType?: string): string {
     if (ext) return ext;
   } catch {}
   return ".bin";
-}
-
-function makeDownloadDir(outputDir?: string): string {
-  if (outputDir) {
-    fs.mkdirSync(outputDir, { recursive: true });
-    return outputDir;
-  }
-  const home = process.env.HOME || process.env.USERPROFILE || ".";
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  const dir = path.join(home, ".auth-fetch-mcp", "downloads", timestamp);
-  fs.mkdirSync(dir, { recursive: true });
-  return dir;
 }
 
 /**
@@ -223,7 +212,13 @@ export function registerTools(server: McpServer): void {
 
       try {
         const ctx = await getOrLaunchBrowser(false);
-        const dir = makeDownloadDir(output_dir);
+        let dir: string;
+        try {
+          dir = resolveSafeOutputDir(output_dir);
+        } catch (err) {
+          await closeBrowser();
+          return errorResult((err as Error).message);
+        }
 
         const files: {
           url: string;
@@ -235,7 +230,8 @@ export function registerTools(server: McpServer): void {
         let counter = 0;
         for (const url of urls) {
           try {
-            const response = await ctx.request.get(url);
+            const safeUrl = await assertSafeUrl(url);
+            const response = await ctx.request.get(safeUrl.toString());
             if (!response.ok()) {
               files.push({ url, error: `HTTP ${response.status()}` });
               continue;

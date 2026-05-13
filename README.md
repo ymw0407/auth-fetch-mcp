@@ -52,7 +52,7 @@ The primary tool. Fetches page content using a real browser, opening a window fo
 
 | Parameter  | Type   | Required | Description |
 |-----------|--------|----------|-------------|
-| `url`     | string | yes      | The URL to fetch content from |
+| `url`     | string | yes      | The URL to fetch content from (only `http`/`https`; see [URL restrictions](#url-restrictions)) |
 | `wait_for`| string | no       | CSS selector to wait for before capturing (useful for SPAs) |
 
 ### `download_media`
@@ -61,8 +61,8 @@ Downloads files from URLs using saved browser sessions. Use this to lazily downl
 
 | Parameter    | Type     | Required | Description |
 |-------------|----------|----------|-------------|
-| `urls`      | string[] | yes      | One or more URLs to download |
-| `output_dir`| string   | no       | Directory to save files to (defaults to `~/.auth-fetch-mcp/downloads/<timestamp>/`) |
+| `urls`      | string[] | yes      | One or more URLs to download (only `http`/`https`; see [URL restrictions](#url-restrictions)) |
+| `output_dir`| string   | no       | Subdirectory under `~/.auth-fetch-mcp/downloads/` to save files into. Absolute paths or `..` segments that escape this root are rejected. Defaults to `~/.auth-fetch-mcp/downloads/<timestamp>/` |
 
 **Example flow:**
 
@@ -84,6 +84,43 @@ Lists all open tabs in the browser with their URLs and titles.
 ### `close_browser`
 
 Closes the browser window. Login sessions are saved and will be reused next time.
+
+## URL restrictions
+
+To prevent SSRF (server-side request forgery) attacks driven by prompt injection, both `auth_fetch` and `download_media` validate every URL before dispatching it:
+
+- Only `http` and `https` schemes are allowed. `file:`, `data:`, `javascript:`, etc. are rejected.
+- The hostname is resolved via DNS and **the resulting IP** is checked. Requests are rejected when the address falls in private, loopback, link-local, CGNAT, or multicast ranges:
+  - IPv4: `0.0.0.0/8`, `10.0.0.0/8`, `100.64.0.0/10`, `127.0.0.0/8`, `169.254.0.0/16`, `172.16.0.0/12`, `192.0.0.0/24`, `192.168.0.0/16`, `198.18.0.0/15`, `224.0.0.0/4`, `240.0.0.0/4`
+  - IPv6: `::`, `::1`, `fc00::/7`, `fe80::/10`, `ff00::/8`, IPv4-mapped equivalents
+- `download_media` additionally constrains `output_dir` to stay inside `~/.auth-fetch-mcp/downloads/`. Absolute paths and `..` segments that escape this root are rejected.
+
+### Allowing private hosts
+
+If you need to access a host on your local machine or LAN (e.g., a dev server, NAS, or Tailscale node), opt in with environment variables:
+
+| Variable | Effect |
+|---|---|
+| `AUTH_FETCH_ALLOW_PRIVATE` | Set to `1`, `true`, or `yes` to disable all private/loopback/link-local checks. Most permissive — use only in trusted environments. |
+| `AUTH_FETCH_ALLOW_HOSTS`   | Comma-separated allowlist of hostnames or IPs. Matches against the URL's hostname **and** every resolved IP. |
+
+`.mcp.json` example:
+
+```json
+{
+  "mcpServers": {
+    "auth-fetch": {
+      "command": "npx",
+      "args": ["auth-fetch-mcp@latest"],
+      "env": {
+        "AUTH_FETCH_ALLOW_HOSTS": "localhost,127.0.0.1,192.168.1.10"
+      }
+    }
+  }
+}
+```
+
+> **Heads up:** enabling these variables re-opens those hosts to any prompt the MCP client (LLM) processes. Prefer the narrowest possible allowlist over `AUTH_FETCH_ALLOW_PRIVATE=1`, and only enable them in environments you trust.
 
 ## Data Storage
 
@@ -120,6 +157,7 @@ rm -rf ~/.auth-fetch-mcp/
 - First access to each service requires manual login
 - Very long pages are truncated to fit LLM context windows (100K chars)
 - Some sites with aggressive bot detection may not work (try the `wait_for` option)
+- Private, loopback, and link-local hosts are blocked by default — opt in via `AUTH_FETCH_ALLOW_PRIVATE` / `AUTH_FETCH_ALLOW_HOSTS` (see [URL restrictions](#url-restrictions))
 
 ## Privacy
 
