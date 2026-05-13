@@ -2,6 +2,7 @@ import { chromium, BrowserContext, Page } from "playwright";
 import { execSync } from "child_process";
 import path from "path";
 import fs from "fs";
+import { assertSafeUrl } from "./security.js";
 
 let context: BrowserContext | null = null;
 
@@ -54,13 +55,18 @@ export async function navigateTo(
   ctx: BrowserContext,
   url: string
 ): Promise<Page> {
+  const safeUrl = await assertSafeUrl(url);
+
   const pages = ctx.pages();
   const page =
     pages.length > 0 && pages[pages.length - 1].url() === "about:blank"
       ? pages[pages.length - 1]
       : await ctx.newPage();
 
-  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
+  await page.goto(safeUrl.toString(), {
+    waitUntil: "domcontentloaded",
+    timeout: 30000,
+  });
   return page;
 }
 
