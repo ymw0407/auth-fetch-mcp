@@ -46,6 +46,19 @@ function isPrivateV6(ip: string): boolean {
   if (lower.startsWith("::ffff:")) {
     const v4 = lower.slice(7);
     if (net.isIPv4(v4)) return isPrivateV4(v4);
+    // WHATWG URL parser hex-normalizes IPv4-mapped IPv6 addresses, e.g.
+    // ::ffff:127.0.0.1 -> ::ffff:7f00:1. Reconstruct the IPv4 from the two
+    // trailing hex groups so the private-range check still applies.
+    const groups = v4.split(":");
+    if (
+      groups.length === 2 &&
+      groups.every((g) => /^[0-9a-f]{1,4}$/.test(g))
+    ) {
+      const hi = parseInt(groups[0], 16);
+      const lo = parseInt(groups[1], 16);
+      const mapped = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+      return isPrivateV4(mapped);
+    }
   }
   return false;
 }
