@@ -49,18 +49,19 @@ export async function getOrLaunchBrowser(
 }
 
 /**
- * Installs a request guard that re-validates page requests against
- * assertSafeUrl, aborting any that resolves to a private/loopback/link-local
- * address.
+ * Installs a request guard that re-validates EVERY http(s) request the page
+ * makes against assertSafeUrl, aborting any that resolves to a private/
+ * loopback/link-local address.
  *
  * A one-time check on the initial URL cannot catch a public URL that issues a
- * 3xx redirect to an internal address (or a DNS-rebinding host). The tricky
- * part is that Chromium follows a top-level/frame *document* redirect INTERNALLY
- * and does NOT re-invoke page.route for the redirect target (verified: only the
- * initial navigation and subresources are surfaced). So for documents we follow
- * redirects ourselves via route.fetch({maxRedirects:0}) and re-validate each
- * hop; subresources are surfaced individually, so validate-and-continue suffices
- * for them. Closes GHSA-8252-gw22-5q42.
+ * 3xx redirect to an internal address (or a DNS-rebinding host). Crucially,
+ * Chromium follows redirects INTERNALLY and does NOT re-invoke page.route for
+ * the redirect target — for documents AND subresources alike (verified: only
+ * the initial request of each is surfaced). A validate-and-continue on the
+ * initial URL alone therefore misses every redirect hop. So we follow redirects
+ * ourselves for every request via route.fetch({maxRedirects:0}), re-validate
+ * each hop, and fulfill the browser with the final validated response. Closes
+ * GHSA-8252-gw22-5q42.
  */
 async function installSsrfGuard(page: Page): Promise<void> {
   // Cache decisions per host for the lifetime of this guard so a page with
@@ -77,7 +78,7 @@ async function installSsrfGuard(page: Page): Promise<void> {
     const cached = decisions.get(host);
     if (cached !== undefined) return cached;
     // assertSafeUrl rejects private/loopback/link-local hosts AND non-http(s)
-    // schemes (e.g. a document redirected to file:), so both are treated unsafe.
+    // schemes (e.g. a request redirected to file:), so both are treated unsafe.
     const ok = await assertSafeUrl(rawUrl).then(
       () => true,
       () => false
@@ -87,8 +88,7 @@ async function installSsrfGuard(page: Page): Promise<void> {
   };
 
   await page.route("**/*", async (route) => {
-    const request = route.request();
-    const url = request.url();
+    const url = route.request().url();
 
     let protocol: string;
     try {
@@ -102,16 +102,9 @@ async function installSsrfGuard(page: Page): Promise<void> {
       return route.continue();
     }
 
-    // Subresources (images, scripts, XHR/fetch) are each surfaced to this
-    // handler on their own, so a single validate-and-continue is enough.
-    if (request.resourceType() !== "document") {
-      return (await isSafe(url))
-        ? route.continue()
-        : route.abort("blockedbyclient");
-    }
-
-    // Document navigation: follow redirects manually, re-validating each hop,
-    // and fulfill the browser with the final (validated) response.
+    // Follow redirects manually, re-validating each hop, and fulfill the
+    // browser with the final (validated) response. Applies to documents and
+    // subresources alike, since neither surfaces its redirect target to us.
     let current = url;
     for (let hop = 0; hop <= 20; hop++) {
       if (!(await isSafe(current))) return route.abort("blockedbyclient");
