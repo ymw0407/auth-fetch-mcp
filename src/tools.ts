@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { Page, ConsoleMessage } from "playwright";
+import { Page, ConsoleMessage, BrowserContext, APIResponse } from "playwright";
 import path from "path";
 import fs from "fs";
 import {
@@ -44,6 +44,39 @@ function guessExtension(url: string, contentType?: string): string {
     if (ext) return ext;
   } catch {}
   return ".bin";
+}
+
+/**
+ * Fetches a URL while following redirects MANUALLY, re-validating every hop
+ * with assertSafeUrl.
+ *
+ * Playwright's request context follows redirects on its own (maxRedirects=20 by
+ * default) and only the initial URL would otherwise be checked, so a public URL
+ * that 3xx-redirects to an internal address (e.g. the cloud metadata endpoint)
+ * bypasses the SSRF guard. Disabling auto-follow and re-checking each Location
+ * closes that bypass (GHSA-8252-gw22-5q42).
+ */
+async function getWithSafeRedirects(
+  ctx: BrowserContext,
+  rawUrl: string,
+  maxRedirects = 20
+): Promise<APIResponse> {
+  let currentUrl = rawUrl;
+  for (let hop = 0; hop <= maxRedirects; hop++) {
+    const safeUrl = await assertSafeUrl(currentUrl);
+    const response = await ctx.request.get(safeUrl.toString(), {
+      maxRedirects: 0,
+    });
+    const status = response.status();
+    if (status >= 300 && status < 400) {
+      const location = response.headers()["location"];
+      if (!location) return response;
+      currentUrl = new URL(location, safeUrl).toString();
+      continue;
+    }
+    return response;
+  }
+  throw new Error(`Too many redirects while fetching ${rawUrl}`);
 }
 
 /**
@@ -230,8 +263,7 @@ export function registerTools(server: McpServer): void {
         let counter = 0;
         for (const url of urls) {
           try {
-            const safeUrl = await assertSafeUrl(url);
-            const response = await ctx.request.get(safeUrl.toString());
+            const response = await getWithSafeRedirects(ctx, url);
             if (!response.ok()) {
               files.push({ url, error: `HTTP ${response.status()}` });
               continue;

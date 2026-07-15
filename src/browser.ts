@@ -49,6 +49,87 @@ export async function getOrLaunchBrowser(
 }
 
 /**
+ * Installs a request guard that re-validates EVERY http(s) request the page
+ * makes against assertSafeUrl, aborting any that resolves to a private/
+ * loopback/link-local address.
+ *
+ * A one-time check on the initial URL cannot catch a public URL that issues a
+ * 3xx redirect to an internal address (or a DNS-rebinding host). Crucially,
+ * Chromium follows redirects INTERNALLY and does NOT re-invoke page.route for
+ * the redirect target — for documents AND subresources alike (verified: only
+ * the initial request of each is surfaced). A validate-and-continue on the
+ * initial URL alone therefore misses every redirect hop. So we follow redirects
+ * ourselves for every request via route.fetch({maxRedirects:0}), re-validate
+ * each hop, and fulfill the browser with the final validated response. Closes
+ * GHSA-8252-gw22-5q42.
+ */
+async function installSsrfGuard(page: Page): Promise<void> {
+  // Cache decisions per host for the lifetime of this guard so a page with
+  // many subresources does not trigger a DNS lookup on every request.
+  const decisions = new Map<string, boolean>();
+
+  const isSafe = async (rawUrl: string): Promise<boolean> => {
+    let host: string;
+    try {
+      host = new URL(rawUrl).host;
+    } catch {
+      return false;
+    }
+    const cached = decisions.get(host);
+    if (cached !== undefined) return cached;
+    // assertSafeUrl rejects private/loopback/link-local hosts AND non-http(s)
+    // schemes (e.g. a request redirected to file:), so both are treated unsafe.
+    const ok = await assertSafeUrl(rawUrl).then(
+      () => true,
+      () => false
+    );
+    decisions.set(host, ok);
+    return ok;
+  };
+
+  await page.route("**/*", async (route) => {
+    const url = route.request().url();
+
+    let protocol: string;
+    try {
+      protocol = new URL(url).protocol;
+    } catch {
+      return route.continue();
+    }
+    // Non-network schemes (data:, blob:, about:, filesystem:) carry no
+    // resolvable host and cannot reach an internal service — let them through.
+    if (protocol !== "http:" && protocol !== "https:") {
+      return route.continue();
+    }
+
+    // Follow redirects manually, re-validating each hop, and fulfill the
+    // browser with the final (validated) response. Applies to documents and
+    // subresources alike, since neither surfaces its redirect target to us.
+    let current = url;
+    for (let hop = 0; hop <= 20; hop++) {
+      if (!(await isSafe(current))) return route.abort("blockedbyclient");
+
+      let response;
+      try {
+        response = await route.fetch({ url: current, maxRedirects: 0 });
+      } catch {
+        return route.abort("failed");
+      }
+
+      const status = response.status();
+      if (status >= 300 && status < 400) {
+        const location = response.headers()["location"];
+        if (!location) return route.fulfill({ response });
+        current = new URL(location, current).toString();
+        continue;
+      }
+      return route.fulfill({ response });
+    }
+    return route.abort("blockedbyclient");
+  });
+}
+
+/**
  * Navigates to the given URL, reusing a blank tab if available.
  */
 export async function navigateTo(
@@ -62,6 +143,8 @@ export async function navigateTo(
     pages.length > 0 && pages[pages.length - 1].url() === "about:blank"
       ? pages[pages.length - 1]
       : await ctx.newPage();
+
+  await installSsrfGuard(page);
 
   await page.goto(safeUrl.toString(), {
     waitUntil: "domcontentloaded",

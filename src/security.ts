@@ -37,29 +37,83 @@ function isPrivateV4(ip: string): boolean {
   return PRIVATE_V4_RANGES.some(([base, mask]) => (n & mask) === base);
 }
 
+/**
+ * Expands an IPv6 string into its 8 16-bit hextets, handling "::" zero
+ * compression and a trailing dotted-quad (e.g. ::ffff:127.0.0.1). Returns null
+ * if the input is not a well-formed IPv6 literal.
+ */
+function ipv6ToHextets(ip: string): number[] | null {
+  let s = ip.toLowerCase();
+  const pct = s.indexOf("%");
+  if (pct !== -1) s = s.slice(0, pct); // strip zone id
+
+  // Fold a trailing embedded IPv4 (dotted quad) into two hextets.
+  const lastColon = s.lastIndexOf(":");
+  if (lastColon !== -1 && s.slice(lastColon + 1).includes(".")) {
+    const quad = s.slice(lastColon + 1).split(".");
+    if (quad.length !== 4) return null;
+    const n = quad.map((q) => (/^\d{1,3}$/.test(q) ? Number(q) : NaN));
+    if (n.some((x) => Number.isNaN(x) || x > 255)) return null;
+    const hi = ((n[0] << 8) | n[1]) & 0xffff;
+    const lo = ((n[2] << 8) | n[3]) & 0xffff;
+    s = `${s.slice(0, lastColon + 1)}${hi.toString(16)}:${lo.toString(16)}`;
+  }
+
+  const halves = s.split("::");
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(":") : [];
+  const tail = halves.length === 2 ? (halves[1] ? halves[1].split(":") : []) : null;
+
+  let groups: string[];
+  if (tail === null) {
+    groups = head; // no "::" — must be fully specified
+  } else {
+    const fill = 8 - head.length - tail.length;
+    if (fill < 1) return null; // "::" must stand for at least one zero group
+    groups = [...head, ...Array(fill).fill("0"), ...tail];
+  }
+  if (groups.length !== 8) return null;
+  if (!groups.every((g) => /^[0-9a-f]{1,4}$/.test(g))) return null;
+  return groups.map((g) => parseInt(g, 16));
+}
+
 function isPrivateV6(ip: string): boolean {
   const lower = ip.toLowerCase();
   if (lower === "::" || lower === "::1") return true;
   if (lower.startsWith("fe80:") || lower.startsWith("fe80::")) return true;
   if (lower.startsWith("fc") || lower.startsWith("fd")) return true;
   if (lower.startsWith("ff")) return true;
-  if (lower.startsWith("::ffff:")) {
-    const v4 = lower.slice(7);
-    if (net.isIPv4(v4)) return isPrivateV4(v4);
-    // WHATWG URL parser hex-normalizes IPv4-mapped IPv6 addresses, e.g.
-    // ::ffff:127.0.0.1 -> ::ffff:7f00:1. Reconstruct the IPv4 from the two
-    // trailing hex groups so the private-range check still applies.
-    const groups = v4.split(":");
-    if (
-      groups.length === 2 &&
-      groups.every((g) => /^[0-9a-f]{1,4}$/.test(g))
-    ) {
-      const hi = parseInt(groups[0], 16);
-      const lo = parseInt(groups[1], 16);
-      const mapped = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
-      return isPrivateV4(mapped);
-    }
+
+  const h = ipv6ToHextets(ip);
+  if (!h) return true; // cannot parse -> fail closed
+
+  const embeddedV4 = (a: number, b: number): string =>
+    `${(a >> 8) & 0xff}.${a & 0xff}.${(b >> 8) & 0xff}.${b & 0xff}`;
+
+  // IPv6 forms that embed an IPv4 address. If the embedded IPv4 is private/
+  // loopback/link-local, the endpoint is too, regardless of the wrapper — so
+  // check it. Public embedded IPv4 (e.g. ::ffff:8.8.8.8) stays allowed.
+  //   ::a.b.c.d          IPv4-compatible (::/96, deprecated)
+  //   ::ffff:a.b.c.d     IPv4-mapped (::ffff:0:0/96)
+  //   ::ffff:0:a.b.c.d   IPv4-translated (::ffff:0:0:0/96)
+  if (h[0] === 0 && h[1] === 0 && h[2] === 0 && h[3] === 0) {
+    const wrapped =
+      (h[4] === 0 && h[5] === 0) ||
+      (h[4] === 0 && h[5] === 0xffff) ||
+      (h[4] === 0xffff && h[5] === 0);
+    if (wrapped && isPrivateV4(embeddedV4(h[6], h[7]))) return true;
   }
+  // NAT64 well-known prefix 64:ff9b::/96 (RFC 6052).
+  if (
+    h[0] === 0x64 && h[1] === 0xff9b &&
+    h[2] === 0 && h[3] === 0 && h[4] === 0 && h[5] === 0 &&
+    isPrivateV4(embeddedV4(h[6], h[7]))
+  ) {
+    return true;
+  }
+  // 6to4 2002:V4::/16 (RFC 3056) — embedded IPv4 in bits 16..48.
+  if (h[0] === 0x2002 && isPrivateV4(embeddedV4(h[1], h[2]))) return true;
+
   return false;
 }
 
