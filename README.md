@@ -7,7 +7,7 @@ Let your AI read a login-protected page through a local browser and **your appro
 
 Version 4 defaults to readable text and returns source metadata, links, media, and completeness warnings. All server instructions, reusable prompts, and capture controls are in English.
 
-[v4.0.0 release notes](https://github.com/ymw0407/auth-fetch-mcp/releases/tag/v4.0.0) · [Changelog](CHANGELOG.md) · [Security policy](SECURITY.md)
+[v4.0.0 release notes](https://github.com/ymw0407/auth-fetch-mcp/releases/tag/v4.0.0) · [Changelog](https://github.com/ymw0407/auth-fetch-mcp/blob/main/CHANGELOG.md) · [Security policy](https://github.com/ymw0407/auth-fetch-mcp/blob/main/SECURITY.md)
 
 ## Install
 
@@ -208,7 +208,7 @@ Tests cover URL/path restrictions, DNS rebinding and redirects, plus a real Chro
 
 ## Contributing
 
-Open an issue for bugs or feature requests, including the client, server version, and a redacted error. Never include passwords, cookies, signed attachment URLs, or private captured content. Report vulnerabilities privately using the [security policy](SECURITY.md).
+Open an issue for bugs or feature requests, including the client, server version, and a redacted error. Never include passwords, cookies, signed attachment URLs, or private captured content. Report vulnerabilities privately using the [security policy](https://github.com/ymw0407/auth-fetch-mcp/blob/main/SECURITY.md).
 
 ## License
 
