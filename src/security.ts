@@ -187,9 +187,7 @@ export function resolveSafeOutputDir(outputDir: string | undefined): string {
       .toISOString()
       .replace(/[:.]/g, "-")
       .slice(0, 19);
-    const dir = path.join(root, timestamp);
-    fs.mkdirSync(dir, { recursive: true });
-    return dir;
+    return fs.mkdtempSync(path.join(root, timestamp + "-"));
   }
 
   const resolved = path.resolve(root, outputDir);

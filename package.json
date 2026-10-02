@@ -1,19 +1,20 @@
 {
   "name": "auth-fetch-mcp",
-  "version": "3.0.4",
+  "version": "4.0.0",
   "description": "MCP server that lets AI read Notion, Google Docs, Jira & any login-protected page via a real browser",
   "main": "dist/index.js",
   "bin": {
     "auth-fetch-mcp": "dist/index.js"
   },
   "files": [
-    "dist/**/*"
+    "dist/**/*",
+    "demo/capture-panel.png"
   ],
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
     "prepublishOnly": "npm run build",
-    "test": "npm run build && node test/security.cjs"
+    "test": "npm run build && node test/security.cjs && node test/workflow.cjs"
   },
   "keywords": [
     "mcp",
@@ -57,5 +58,8 @@
   "devDependencies": {
     "@types/node": "^25.5.0",
     "typescript": "^6.0.2"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

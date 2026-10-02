@@ -22,7 +22,19 @@ jobs:
       - run: npm ci
       - run: npm run build
 
+      # A maintainer may publish locally when the repository token has expired.
+      - name: Check whether this version is already published
+        id: npm-version
+        run: |
+          VERSION=$(node -p 'require("./package.json").version')
+          if npm view "auth-fetch-mcp@$VERSION" version >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish to npm
+        if: steps.npm-version.outputs.exists != 'true'
         run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
