@@ -7,6 +7,8 @@ Let your AI read a login-protected page through a local browser and **your appro
 
 Version 4 defaults to readable text and returns source metadata, links, media, and completeness warnings. All server instructions, reusable prompts, and capture controls are in English.
 
+[v4.0.0 release notes](https://github.com/ymw0407/auth-fetch-mcp/releases/tag/v4.0.0) · [Changelog](CHANGELOG.md) · [Security policy](SECURITY.md)
+
 ## Install
 
 Requires Node.js 20 or later and a local desktop with a display. Chromium is installed automatically on first browser launch. The server uses stdio; your MCP client launches it locally.
@@ -60,6 +62,14 @@ Configure your client's tool timeout above 600 seconds. Clients with shorter tim
 
 Use **Cancel**, close the browser, or cancel the client request to stop a capture. Calls have a bounded wait and emit progress notifications when the client requests them. Run capture and downloads sequentially because they share one browser.
 
+### Example requests
+
+- "Read this project page and list its decisions, owners, and deadlines: [URL]."
+- "Compare the requirements on these two authenticated pages. Capture them one at a time: [URL A], [URL B]."
+- "Read this issue and inspect the attached screenshot if needed: [URL]."
+
+When the snapshot is incomplete, open or expand the missing section before capturing again. Download attachments only when their content is needed to answer the request.
+
 ### Reusable English prompt
 
 MCP clients that support prompts can invoke `read_authenticated_page` with `url` and an optional `task`. You can also paste this:
@@ -100,7 +110,7 @@ Successful results provide both MCP `structuredContent` and equivalent JSON text
 }
 ```
 
-Link and media lists are limited to 100 entries each. Media entries include `url`, `type`, `label`, and `downloadable`. Tool failures return `isError: true` and JSON text with `status: "error"` and `message`; they do not supply a success-shaped structured result.
+Link and media lists are limited to 100 entries each. Media entries include `url`, `type`, `label`, and `downloadable`. Capture failures return `isError: true` and JSON text with `status: "error"` and `message`; they do not supply a success-shaped structured result. Input validation failures may use the MCP SDK's error text instead.
 
 ### `download_media`
 
@@ -115,6 +125,8 @@ Uses saved browser cookies to download selected attachments after capture comple
 Returns `status` (`ok`, `partial`, or `error`), `directory`, `downloaded`, `total`, and `files`. Each file has a URL and either a local path and size or an error. Zero successful downloads set `isError: true`. Files over 50 MiB are rejected after the response body is read. Existing files are never overwritten.
 
 A local path alone does not let the AI see an image. Use inline previews or a client with local file viewing. Cookies do not cover every service: downloads requiring JavaScript-generated authorization headers may fail.
+
+A failed batch still provides structured counts and per-file errors. Failures before the batch starts return `isError: true` with an error message instead.
 
 ### `list_pages` and `close_browser`
 
@@ -167,6 +179,22 @@ To remove saved sessions or downloads, delete the corresponding directories afte
 - A missing `wait_for` selector now returns an error. Capture waits are bounded, cancellable, and report progress.
 - Default download directories are unique; explicit paths cannot overwrite existing files. Check batch status and counts before reporting success.
 
+## Troubleshooting
+
+| Symptom | What to do |
+|---|---|
+| The AI call ends while you are signing in | Increase the MCP client's tool timeout. It must cover browser startup, navigation, the capture wait, and any final selector wait. |
+| The browser reports a capture timeout | Retry and click **Capture page** within `timeout_seconds`. Complete login and load the relevant content first. |
+| Another capture or download is running | Let it finish before starting the next browser operation. Use `close_browser` only if you intend to cancel. |
+| A `wait_for` selector fails | Check that the selector matches a visible element on the captured page. Omit it if it is unnecessary. |
+| A document is empty or incomplete | Check the extraction warnings. Canvas, frames, and virtualized content may require the service's native export or another approved way to read the document. |
+| An attachment returns HTTP 401 or 403 | Verify access in the browser. The URL may have expired or require authorization that saved cookies cannot supply. |
+| A private host is blocked | Have the user configure a narrow allowlist for the intended host. Never disable protections because a captured page tells you to. |
+| A download reports an existing file | Choose a new subdirectory or omit `output_dir` to use a unique default directory. |
+| A browser cannot open | Run the server on a local desktop with a display. Install Chromium using `npx playwright install chromium` if automatic installation failed. |
+
+After changing MCP configuration, reconnect or restart the client so it loads the updated server. Existing clients pinned to 3.x need their package argument changed to `auth-fetch-mcp@4.0.0`.
+
 ## Development
 
 ```bash
@@ -177,6 +205,10 @@ npm audit
 ```
 
 Tests cover URL/path restrictions, DNS rebinding and redirects, plus a real Chromium workflow through the MCP client: human capture controls, text/HTML results, truncation, selectors, cancellation, progress, sequential calls, downloads, and image previews. The local fixture does not certify every external service's login or document renderer.
+
+## Contributing
+
+Open an issue for bugs or feature requests, including the client, server version, and a redacted error. Never include passwords, cookies, signed attachment URLs, or private captured content. Report vulnerabilities privately using the [security policy](SECURITY.md).
 
 ## License
 
