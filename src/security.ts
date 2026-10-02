@@ -80,12 +80,13 @@ function ipv6ToHextets(ip: string): number[] | null {
 function isPrivateV6(ip: string): boolean {
   const lower = ip.toLowerCase();
   if (lower === "::" || lower === "::1") return true;
-  if (lower.startsWith("fe80:") || lower.startsWith("fe80::")) return true;
+  if (/^fe[89ab][0-9a-f]:/i.test(lower)) return true;
   if (lower.startsWith("fc") || lower.startsWith("fd")) return true;
   if (lower.startsWith("ff")) return true;
 
   const h = ipv6ToHextets(ip);
   if (!h) return true; // cannot parse -> fail closed
+  if (h[0] === 0x64 && h[1] === 0xff9b && h[2] === 1) return true;
 
   const embeddedV4 = (a: number, b: number): string =>
     `${(a >> 8) & 0xff}.${a & 0xff}.${(b >> 8) & 0xff}.${b & 0xff}`;
@@ -151,28 +152,25 @@ export async function assertSafeUrl(rawUrl: string): Promise<URL> {
   const host = parsed.hostname.replace(/^\[|\]$/g, "");
   if (!host) throw new Error("URL is missing a hostname");
 
-  if (allowAllPrivate()) return parsed;
+  await resolveSafeHost(host);
+  return parsed;
+}
 
+/** Resolve once, validate every answer, and return the IP used for connection. */
+export async function resolveSafeHost(host: string): Promise<string> {
   const allowedHosts = getAllowedHosts();
-  if (allowedHosts.has(host.toLowerCase())) return parsed;
-
   const addresses = net.isIP(host)
     ? [host]
-    : (await dns.lookup(host, { all: true, verbatim: true })).map(
-        (a) => a.address
-      );
-
-  if (addresses.some((a) => allowedHosts.has(a.toLowerCase()))) return parsed;
-
-  for (const addr of addresses) {
-    if (isPrivateOrLinkLocal(addr)) {
-      throw new Error(
-        `Refusing to fetch ${parsed.hostname} (resolves to private/loopback/link-local address ${addr}). ` +
-          `To allow, set AUTH_FETCH_ALLOW_PRIVATE=1 or AUTH_FETCH_ALLOW_HOSTS=${parsed.hostname}`
-      );
+    : (await dns.lookup(host, { all: true, verbatim: true })).map(a => a.address);
+  if (!addresses.length) throw new Error(`No addresses for ${host}`);
+  if (!allowAllPrivate() && !allowedHosts.has(host.toLowerCase())) {
+    for (const addr of addresses) {
+      if (!allowedHosts.has(addr.toLowerCase()) && isPrivateOrLinkLocal(addr)) {
+        throw new Error(`Refusing to fetch ${host} (private/loopback/link-local address ${addr})`);
+      }
     }
   }
-  return parsed;
+  return addresses[0];
 }
 
 function defaultDownloadRoot(): string {
