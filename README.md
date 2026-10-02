@@ -90,9 +90,9 @@ Closes the browser window. Login sessions are saved and will be reused next time
 To prevent SSRF (server-side request forgery) attacks driven by prompt injection, both `auth_fetch` and `download_media` validate every URL before dispatching it:
 
 - Only `http` and `https` schemes are allowed. `file:`, `data:`, `javascript:`, etc. are rejected.
-- The hostname is resolved via DNS and **the resulting IP** is checked. Requests are rejected when the address falls in private, loopback, link-local, CGNAT, or multicast ranges:
+- A local proxy resolves each destination once, validates **every returned IP**, and connects directly to a validated IP. Chromium and downloads share this proxy, so redirects and subresources cannot bypass validation through a second DNS lookup. HTTPS keeps the original hostname for TLS certificate validation and SNI. Requests are rejected when the address falls in private, loopback, link-local, CGNAT, or multicast ranges:
   - IPv4: `0.0.0.0/8`, `10.0.0.0/8`, `100.64.0.0/10`, `127.0.0.0/8`, `169.254.0.0/16`, `172.16.0.0/12`, `192.0.0.0/24`, `192.168.0.0/16`, `198.18.0.0/15`, `224.0.0.0/4`, `240.0.0.0/4`
-  - IPv6: `::`, `::1`, `fc00::/7`, `fe80::/10`, `ff00::/8`, IPv4-mapped equivalents
+  - IPv6: `::`, `::1`, `fc00::/7`, `fe80::/10`, `ff00::/8`, IPv4-mapped equivalents, NAT64 local-use `64:ff9b:1::/48`
 - `download_media` additionally constrains `output_dir` to stay inside `~/.auth-fetch-mcp/downloads/`. Absolute paths and `..` segments that escape this root are rejected.
 
 ### Allowing private hosts
@@ -102,7 +102,7 @@ If you need to access a host on your local machine or LAN (e.g., a dev server, N
 | Variable | Effect |
 |---|---|
 | `AUTH_FETCH_ALLOW_PRIVATE` | Set to `1`, `true`, or `yes` to disable all private/loopback/link-local checks. Most permissive — use only in trusted environments. |
-| `AUTH_FETCH_ALLOW_HOSTS`   | Comma-separated allowlist of hostnames or IPs. Matches against the URL's hostname **and** every resolved IP. |
+| `AUTH_FETCH_ALLOW_HOSTS`   | Comma-separated allowlist of hostnames or IPs. Matches the URL hostname or individual resolved IPs; allowing one IP never allows other private answers. |
 
 `.mcp.json` example:
 
